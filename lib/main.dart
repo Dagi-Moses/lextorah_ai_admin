@@ -25,7 +25,10 @@ class MyApp extends StatelessWidget {
       title: 'Lextorah AI',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.green,
+          surface: Colors.white,
+        ),
       ),
       routerConfig: AppRouter.createRouter(),
     );

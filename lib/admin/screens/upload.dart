@@ -4,7 +4,6 @@ import 'package:lextorah_chat_bot/admin/components/file_upload_box.dart';
 
 import 'package:lextorah_chat_bot/admin/components/uploaded_files_table.dart';
 import 'package:lextorah_chat_bot/providers/upload_provider.dart';
-import 'package:lextorah_chat_bot/utils/screen_helper.dart';
 
 class AdminPanel extends StatelessWidget {
   const AdminPanel({super.key});
@@ -12,7 +11,7 @@ class AdminPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final smallScreen = ScreenHelper.isMobile(context);
+
     return Scaffold(
       body: Stack(
         children: [

@@ -20,10 +20,9 @@ class UploadedFilesTable extends ConsumerWidget {
       return const SizedBox.shrink(); // or Text('No files uploaded')
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Center(
         child: SizedBox(
           width: MediaQuery.of(context).size.width,
           child: DataTable(
@@ -54,7 +53,7 @@ class UploadedFilesTable extends ConsumerWidget {
   DataRow _fileRow(String name, String uploaded, String status, Color color) {
     return DataRow(
       cells: [
-        DataCell(Text(name)),
+        DataCell(Text(name, overflow: TextOverflow.ellipsis)),
         DataCell(Text(uploaded)),
         DataCell(
           Text(

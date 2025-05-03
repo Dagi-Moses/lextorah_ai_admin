@@ -2,7 +2,9 @@ import 'dart:developer';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lextorah_chat_bot/hive/chat_message.dart';
 import 'package:lextorah_chat_bot/providers/chat_controller_provider.dart';
+import 'package:lextorah_chat_bot/providers/chat_messages_provider.dart';
 
 class BottomChatField extends ConsumerStatefulWidget {
   const BottomChatField({super.key});
@@ -28,8 +30,22 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
     final String message = textController.text.trim();
     if (message.isEmpty) return;
 
+    final chatNotifier = ref.read(chatMessagesProvider.notifier);
+
+    // 1. Add user message
+    await chatNotifier.addMessage(ChatMessage(text: message, isUser: true));
+
+    textController.clear();
+
+    await chatNotifier.addMessage(
+      ChatMessage(
+        text: '', // Empty since it's just a placeholder
+        isTyping: true,
+      ),
+    );
+
+    // 2. Add typing indicator (before API call
     try {
-      textController.clear();
       await ref.read(chatControllerProvider).sendMessage(message);
     } catch (e) {
       log('Error sending message: $e');
@@ -98,7 +114,7 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
                   ),
 
                   child: const Padding(
-                    padding: EdgeInsets.all(8.0),
+                    padding: EdgeInsets.all(12.0),
                     child: Icon(
                       size: 20,
                       // Icons.arrow_upward,

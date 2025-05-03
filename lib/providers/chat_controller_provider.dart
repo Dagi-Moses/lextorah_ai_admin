@@ -1,6 +1,5 @@
 import 'dart:convert';
-
-import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:lextorah_chat_bot/hive/chat_message.dart';
@@ -17,105 +16,55 @@ class ChatController {
   ChatController(this.ref);
 
   Future<void> sendMessage(String text) async {
-    final message = ChatMessage(
-      text: text,
-      isUser: true,
-      timestamp: DateTime.now(),
-    );
-    await ref.read(chatMessagesProvider.notifier).addMessage(message);
+    final chatNotifier = ref.read(chatMessagesProvider.notifier);
     try {
-      print("trying..................");
       final response = await http.post(
         Uri.parse(ApiService.ask),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'question': text}),
       );
-      print("reply: " + response.body);
-      print("reply00000: " + response.toString());
+
+      await chatNotifier.removeTypingIndicator();
 
       if (response.statusCode == 200) {
         final reply = jsonDecode(response.body)['answer'] ?? 'No response';
-        print("reply: " + reply);
-        final botMessage = ChatMessage(
-          text: reply,
-          isUser: false,
-          timestamp: DateTime.now(),
-        );
+
+        final botMessage = ChatMessage(text: reply);
+
         await ref.read(chatMessagesProvider.notifier).addMessage(botMessage);
       } else {
         await ref
             .read(chatMessagesProvider.notifier)
             .addMessage(
               ChatMessage(
-                text: 'Error: ${response.statusCode}',
+                text: 'Error: Something went wrong. Please try again later...',
                 isError: true,
-                isUser: false,
-                timestamp: DateTime.now(),
               ),
             );
       }
     } catch (e) {
-      print("error: " + e.toString());
-      await ref
-          .read(chatMessagesProvider.notifier)
-          .addMessage(
-            ChatMessage(
-              text: 'Network error: $e',
-              isError: true,
-              isUser: false,
-              timestamp: DateTime.now(),
-            ),
-          );
+      await chatNotifier.removeTypingIndicator();
+
+      if (e is SocketException) {
+        await ref
+            .read(chatMessagesProvider.notifier)
+            .addMessage(
+              ChatMessage(
+                text:
+                    'Network error: Please check your connection and try again.',
+                isError: true,
+              ),
+            );
+      } else {
+        await ref
+            .read(chatMessagesProvider.notifier)
+            .addMessage(
+              ChatMessage(
+                text: 'Error: Something went wrong. Please try again later.',
+                isError: true,
+              ),
+            );
+      }
     }
   }
 }
-
-// ture<void> sendMessage(String text) async {
-//     final userMessage = ChatMessage(
-//       text: text,
-//       isUser: true,
-//       timestamp: DateTime.now(),
-//     );
-//     _messages.add(userMessage);
-//     _box.add(userMessage);
-//     notifyListeners();
-
-//     try {
-//       final response = await http.post(
-//         Uri.parse(ApiService.ask),
-//         headers: {'Content-Type': 'application/json'},
-//         body: jsonEncode({'question': text}),
-//       );
-
-//       if (response.statusCode == 200) {
-//         final botReply = jsonDecode(response.body)['answer'] ?? 'No response';
-//         final botMessage = ChatMessage(
-//           text: botReply,
-//           isUser: false,
-//           timestamp: DateTime.now(),
-//         );
-//         _messages.add(botMessage);
-//         _box.add(botMessage);
-//       } else {
-//         _messages.add(
-//           ChatMessage(
-//             text: 'Error: ${response.statusCode}',
-//             isError: true,
-//             isUser: false,
-//             timestamp: DateTime.now(),
-//           ),
-//         );
-//       }
-//     } catch (e) {
-//       _messages.add(
-//         ChatMessage(
-//           text: 'Network error: $e',
-//           isUser: false,
-//           timestamp: DateTime.now(),
-//         ),
-//       );
-//     }
-
-//     notifyListeners();
-//   }
-// }

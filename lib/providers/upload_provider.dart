@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,26 +44,15 @@ class UploadController extends StateNotifier<AsyncValue<void>> {
         final response = await request.send();
         final success = response.statusCode == 200;
 
-        try {
-          await ref
-              .read(uploadedFilesProvider.notifier)
-              .addFile(
-                UploadedFileHiveModel(
-                  name: file.name,
-                  timestamp: DateTime.now().millisecondsSinceEpoch,
-                  status: success ? UploadStatus.success : UploadStatus.failed,
-                ),
-              );
-        } catch (e) {
-          Fluttertoast.showToast(
-            msg: "Hive error: $e",
-            toastLength: Toast.LENGTH_LONG,
-            gravity: ToastGravity.BOTTOM,
-            backgroundColor: Colors.red,
-            textColor: Colors.white,
-            fontSize: 16.0,
-          );
-        }
+        await ref
+            .read(uploadedFilesProvider.notifier)
+            .addFile(
+              UploadedFileHiveModel(
+                name: file.name,
+                timestamp: DateTime.now().millisecondsSinceEpoch,
+                status: success ? UploadStatus.success : UploadStatus.failed,
+              ),
+            );
 
         if (!success) {
           final responseBody = await response.stream.bytesToString();
@@ -71,12 +61,19 @@ class UploadController extends StateNotifier<AsyncValue<void>> {
             final detail = decoded['detail'] ?? 'Unknown error';
             errors.add("${file.name}: $detail");
           } catch (_) {
-            errors.add("${file.name}: Unexpected response: $responseBody");
+            errors.add("${file.name}: Unexpected error");
           }
         }
-      } catch (e, st) {
-        print("Upload error: $e");
-        errors.add("${file.name}: $e");
+      } catch (e) {
+        if (e is SocketException) {
+          errors.add(
+            "${file.name}: Network error. Please check your internet connection.",
+          );
+        } else if (e is FormatException) {
+          errors.add("${file.name}: Invalid file format.");
+        } else {
+          errors.add("${file.name}: Unexpected error ");
+        }
       }
     }
 
@@ -84,9 +81,8 @@ class UploadController extends StateNotifier<AsyncValue<void>> {
     ref.read(pickedFilesProvider.notifier).state = [];
     if (errors.isNotEmpty) {
       state = AsyncError(
-        Exception(
-          "Some uploads failed, Please attached valid file types:\n${errors.join('\n')}",
-        ),
+        "Some uploads failed, Please attached valid file types:\n${errors.join('\n')}",
+
         StackTrace.current,
       );
     } else {

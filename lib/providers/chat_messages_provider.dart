@@ -22,4 +22,21 @@ class ChatMessagesNotifier extends StateNotifier<List<ChatMessage>> {
     await box.add(message);
     state = [...state, message];
   }
+
+  Future<void> removeTypingIndicator() async {
+    final box = await Hive.openBox<ChatMessage>('chatBox');
+
+    // Collect keys of typing messages
+    final keysToDelete =
+        box.keys.where((key) {
+          final msg = box.get(key);
+          return msg != null && msg.isTyping;
+        }).toList();
+
+    // Delete them from the box
+    await box.deleteAll(keysToDelete);
+
+    // Reload state from the box
+    state = box.values.toList();
+  }
 }

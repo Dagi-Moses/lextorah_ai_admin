@@ -14,12 +14,16 @@ class ChatMessage extends HiveObject {
   final bool isError;
 
   @HiveField(3)
+  final bool isTyping;
+
+  @HiveField(4)
   final DateTime timestamp;
 
   ChatMessage({
-    this.isError = false,
     required this.text,
-    required this.isUser,
-    required this.timestamp,
-  });
+    this.isTyping = false,
+    this.isError = false,
+    this.isUser = false,
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
 }
