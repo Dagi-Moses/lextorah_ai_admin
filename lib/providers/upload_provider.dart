@@ -5,10 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:http/http.dart' as http;
 
-import 'package:lextorah_chat_bot/components/file_upload_box.dart';
+import 'package:lextorah_chat_bot/admin/components/file_upload_box.dart';
 import 'package:lextorah_chat_bot/hive/uploaded_file_hive_model.dart';
 import 'package:lextorah_chat_bot/providers/uploaded_files_provider.dart';
-import 'package:lextorah_chat_bot/utils/api_service.dart'; // Replace with correct path
+import 'package:lextorah_chat_bot/src/api_service.dart'; // Replace with correct path
 
 final uploadControllerProvider =
     StateNotifierProvider<UploadController, AsyncValue<void>>(

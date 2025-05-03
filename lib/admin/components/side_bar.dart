@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:lextorah_chat_bot/components/nav_item.dart';
+import 'package:lextorah_chat_bot/admin/components/nav_item.dart';
+import 'package:lextorah_chat_bot/src/routes.dart';
 import 'package:lextorah_chat_bot/utils/screen_helper.dart';
 
 // Adjust import
@@ -12,8 +13,6 @@ class SideMenu extends StatefulWidget {
 }
 
 class _SideMenuState extends State<SideMenu> {
-  int _selectedIndex = 0;
-
   @override
   Widget build(BuildContext context) {
     final isTablet = ScreenHelper.isTablet(context);
@@ -36,15 +35,18 @@ class _SideMenuState extends State<SideMenu> {
                     )
                     : Image.asset("assets/logo.png", scale: 7),
           ),
-
           buildNavItem(
-            context,
-            Icons.upload_file,
-            'Upload Document',
-            selected: true,
+            context: context,
+            icon: Icons.chat,
+            label: 'Chat bot',
+            route: AppRoutePath.chatbot,
           ),
-
-          //buildNavItem(context, Icons.settings, 'Settings'),
+          buildNavItem(
+            context: context,
+            icon: Icons.upload_file,
+            label: 'Upload Document',
+            route: AppRoutePath.upload,
+          ),
         ],
       ),
     );
