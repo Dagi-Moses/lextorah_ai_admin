@@ -1,0 +1,296 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:lextorah_chat_bot/providers/shared_pref.dart';
+import 'package:pin_code_fields/pin_code_fields.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:lextorah_chat_bot/models/user.dart';
+import 'package:lextorah_chat_bot/src/routes.dart';
+import 'package:lextorah_chat_bot/utils/roles.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
+
+final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  return AuthNotifier();
+});
+
+class AuthState {
+  final bool isAuthenticated;
+  final User? user;
+  final bool isLoading;
+  final bool authLoading;
+  final String? errorMessage;
+
+  AuthState({
+    required this.isAuthenticated,
+    this.user,
+    this.isLoading = false,
+    this.authLoading = false,
+    this.errorMessage,
+  });
+
+  AuthState copyWith({
+    bool? isAuthenticated,
+    bool? isLoading,
+    bool? authLoading,
+    String? errorMessage,
+    User? user,
+  }) {
+    return AuthState(
+      isAuthenticated: isAuthenticated ?? this.isAuthenticated,
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: errorMessage,
+      user: user ?? this.user,
+      authLoading: authLoading ?? this.authLoading,
+    );
+  }
+}
+
+class AuthNotifier extends StateNotifier<AuthState> {
+  AuthNotifier() : super(AuthState(isAuthenticated: false));
+
+  final _controller = StreamController<void>.broadcast();
+
+  Stream<void> get authChanges => _controller.stream;
+
+  void _notifyAuthChange() {
+    _controller.add(null); // triggers refresh listeners
+  }
+
+  Future<void> freeTrialLogin({
+    required String email,
+    String? password,
+    required BuildContext context,
+    TextEditingController? resendController,
+    bool isResend = false,
+    required WidgetRef ref,
+  }) async {
+    state = state.copyWith(authLoading: true, errorMessage: null);
+    // Retrieve data from SharedPreferences
+    final prefs = ref.read(sharedPrefsProvider);
+    String? pass;
+
+    try {
+      if (isResend) {
+        resendController?.clear();
+        final passwor = prefs.getString('reg_password') ?? '';
+        pass = passwor;
+      }
+      // Persist user data
+      if (!isResend) {
+        await prefs.setString('reg_password', password!);
+      }
+      final response = await http
+          .post(
+            Uri.parse('https://ai1-zjt4.onrender.com/api/freetrial/login'),
+            body: jsonEncode({
+              'email': email,
+              'password': password?.trim() ?? pass?.trim(),
+            }),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 120));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final detail = data['detail'] ?? "OTP sent, please verify to continue";
+
+        Fluttertoast.showToast(
+          msg: detail,
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+          fontSize: 14.0,
+        );
+
+        await Future.delayed(const Duration(seconds: 1));
+
+        if (context.mounted) {
+          context.go(AppRoutePath.otpVerification); // Or OTP route if required
+        }
+
+        state = state.copyWith(authLoading: false);
+      } else {
+        final data = jsonDecode(response.body);
+        final error = data['detail'] ?? 'Login failed. Please try again.';
+
+        state = state.copyWith(authLoading: false, errorMessage: error);
+
+        Fluttertoast.showToast(
+          msg: error,
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+          fontSize: 14.0,
+        );
+      }
+    } on TimeoutException {
+      const error = 'Connection timed out. Please check your network.';
+      state = state.copyWith(authLoading: false, errorMessage: error);
+
+      Fluttertoast.showToast(
+        msg: error,
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 14.0,
+      );
+    } on http.ClientException {
+      const error = 'Network error occurred. Please try again.';
+      state = state.copyWith(authLoading: false, errorMessage: error);
+
+      Fluttertoast.showToast(
+        msg: error,
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 14.0,
+      );
+    } catch (e, stack) {
+      debugPrintStack(label: 'Login error', stackTrace: stack);
+
+      const error = 'Unexpected error occurred. Please try again.';
+      state = state.copyWith(authLoading: false, errorMessage: error);
+
+      Fluttertoast.showToast(
+        msg: error,
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 14.0,
+      );
+    }
+  }
+
+  Future<void> verifyOtp({
+    required BuildContext context,
+    StreamController<ErrorAnimationType>? errorController,
+    String? email,
+    required String otp,
+  }) async {
+    state = state.copyWith(authLoading: true, errorMessage: null);
+    try {
+      final response = await http.post(
+        Uri.parse('https://ai1-zjt4.onrender.com/api/api/verify'),
+        body: jsonEncode({'email': email, 'otp': otp}),
+        headers: {'Content-Type': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final token = data['token'];
+        final trial_ends_at = data['trial_ends_at'];
+        final decoded = JwtDecoder.decode(token);
+
+        state = AuthState(
+          isAuthenticated: true,
+          user: User(
+            id: decoded['sub'],
+            email: decoded['email'],
+            role: userRoleFromString(decoded['role']),
+            tokenExpiresAt: JwtDecoder.getExpirationDate(token),
+            trialEndsAt: DateTime.parse(trial_ends_at),
+            token: token,
+          ),
+        );
+        Fluttertoast.showToast(
+          msg: "success",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+          fontSize: 14.0,
+        );
+        _notifyAuthChange();
+      } else {
+        final data = jsonDecode(response.body);
+        final error = data['detail'] ?? 'Invalid OTP';
+        state = state.copyWith(authLoading: false, errorMessage: error);
+        errorController?.add(ErrorAnimationType.shake); // Tr
+      }
+    } catch (e) {
+      errorController?.add(ErrorAnimationType.shake);
+      print(e);
+    } finally {
+      state = state.copyWith(authLoading: false);
+    }
+  }
+
+  Future<void> register({
+    required String email,
+    required String password,
+    required BuildContext context,
+  }) async {
+    state = state.copyWith(authLoading: true, errorMessage: null);
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('https://ai1-zjt4.onrender.com/api/freetrial/register'),
+            body: jsonEncode({'email': email, 'password': password}),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        state = state.copyWith(authLoading: false);
+        final data = jsonDecode(response.body);
+        print(data.toString());
+
+        Fluttertoast.showToast(
+          msg: "Registration successful, please login to continue",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.CENTER,
+          timeInSecForIosWeb: 1,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+
+        await Future.delayed(const Duration(seconds: 2));
+
+        context.go(AppRoutePath.login);
+      } else {
+        final data = jsonDecode(response.body);
+        final error =
+            data['detail'] ?? 'Registration failed. Please try again.';
+        state = state.copyWith(authLoading: false, errorMessage: error);
+      }
+    } on TimeoutException {
+      state = state.copyWith(
+        authLoading: false,
+        errorMessage: 'Connection timed out. Please check your network.',
+      );
+    } on http.ClientException {
+      state = state.copyWith(
+        authLoading: false,
+        errorMessage: 'Network error occurred. Please try again.',
+      );
+    } catch (e, stack) {
+      debugPrintStack(label: 'Registration error', stackTrace: stack);
+      state = state.copyWith(
+        authLoading: false,
+        errorMessage: 'Unexpected error occurred. Please try again.',
+      );
+    }
+  }
+
+  void logout() {
+    state = AuthState(isAuthenticated: false);
+    _notifyAuthChange();
+  }
+
+  // Don’t forget to close the controller if you manually dispose
+  @override
+  void dispose() {
+    _controller.close();
+    super.dispose();
+  }
+}
