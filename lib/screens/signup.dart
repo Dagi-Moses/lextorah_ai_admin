@@ -36,6 +36,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              SizedBox(height: 5),
               const Text(
                 "Welcome to lextorah - school of languages",
                 style: TextStyle(

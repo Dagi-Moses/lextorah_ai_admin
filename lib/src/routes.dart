@@ -34,12 +34,14 @@ abstract class AppRoutePath {
   static const register = '/auth/register';
   static const otpVerification = '/auth/verify-otp/:email';
   static const student = '/student';
+  static const otpBasePath = '/auth/verify-otp';
 }
 
 const publicPaths = [
   AppRoutePath.login,
   AppRoutePath.register,
-  AppRoutePath.otpVerification,
+  AppRoutePath.otpBasePath,
+  AppRoutePath.chat,
   //AppRoutePath.splash,
 ];
 
@@ -48,45 +50,44 @@ class AppRouter {
     final authState = ref.read(authProvider);
     return GoRouter(
       debugLogDiagnostics: true,
-      initialLocation: AppRoutePath.splash,
+      initialLocation: AppRoutePath.login,
 
-      redirect: (context, state) {
-        final isAuth = authState.isAuthenticated;
-        final UserRole? role = authState.user?.role;
-        final location = state.uri.toString();
+      // redirect: (context, state) {
+      //   final isAuth = authState.isAuthenticated;
+      //   final UserRole? role = authState.user?.role;
+      //   final location = state.uri.toString();
 
-        // 🚫 If user is not authenticated and trying to access protected path
-        if (!isAuth && !publicPaths.any((path) => location.startsWith(path))) {
-          return AppRoutePath.login;
-        }
-        // If authenticated but at login, redirect to role dashboard
-        if (isAuth && location == AppRoutePath.login) {
-          if (role?.isAdmin ?? false) {
-            return AppRoutePath.upload;
-          } else {
-            return AppRoutePath.chat;
-          }
-        }
+      //   // 🚫 If user is not authenticated and trying to access protected path
+      //   if (!isAuth && !publicPaths.any((path) => location.startsWith(path))) {
+      //     return AppRoutePath.login;
+      //   }
+      //   // If authenticated but at login, redirect to role dashboard
+      //   if (isAuth && location == AppRoutePath.login) {
+      //     if (role?.isAdmin ?? false) {
+      //       return AppRoutePath.upload;
+      //     } else {
+      //       return AppRoutePath.chat;
+      //     }
+      //   }
 
-        // Prevent student from accessing admin routes and vice versa
-        if (isAuth &&
-            (role?.isStudent ?? false) &&
-            location == AppRoutePath.upload) {
-          return AppRoutePath.chat;
-        }
+      //   // Prevent student from accessing admin routes and vice versa
+      //   if (isAuth &&
+      //       (role?.isStudent ?? false) &&
+      //       location == AppRoutePath.upload) {
+      //     return AppRoutePath.chat;
+      //   }
 
-        // if (isAuth &&
-        //     (role?.isAdmin ?? false) &&
-        //     location == AppRoutePath.chatbot) {
-        //   return AppRoutePath.upload;
-        // }
+      //   // if (isAuth &&
+      //   //     (role?.isAdmin ?? false) &&
+      //   //     location == AppRoutePath.chatbot) {
+      //   //   return AppRoutePath.upload;
+      //   // }
 
-        return null; // No redirection
-      },
-
-      refreshListenable: GoRouterRefreshStream(
-        ref.watch(authProvider.notifier).authChanges,
-      ), // Add stream to listen to auth changes
+      //   return null; // No redirection
+      // },
+      // refreshListenable: GoRouterRefreshStream(
+      //   ref.watch(authProvider.notifier).authChanges,
+      // ), // Add stream to listen to auth changes
       errorBuilder:
           (context, state) =>
               ErrorScreen(message: state.error?.toString() ?? "Page not found"),
@@ -133,7 +134,7 @@ class AppRouter {
           builder: (context, state) => SignupScreen(),
         ),
         GoRoute(
-          path: 'verify-otp/:email',
+          path: '/auth/verify-otp/:email',
           name: AppRouteName.otpVerification,
           builder: (context, state) {
             final email = state.pathParameters['email'];

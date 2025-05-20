@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:lextorah_chat_bot/hive/chat_message.dart';
+import 'package:lextorah_chat_bot/providers/auth_provider.dart';
 import 'package:lextorah_chat_bot/providers/chat_messages_provider.dart';
 import 'package:lextorah_chat_bot/src/api_service.dart';
 
@@ -17,10 +18,14 @@ class ChatController {
 
   Future<void> sendMessage(String text) async {
     final chatNotifier = ref.read(chatMessagesProvider.notifier);
+    final token = ref.read(authProvider).user?.token;
     try {
       final response = await http.post(
         Uri.parse(ApiService.ask),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
         body: jsonEncode({'question': text}),
       );
 

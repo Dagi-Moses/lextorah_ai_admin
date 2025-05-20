@@ -27,8 +27,10 @@ class ErrorScreen extends StatelessWidget {
               onPressed: () {
                 if (GoRouter.of(context).canPop()) {
                   GoRouter.of(context).pop();
+                } else if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
                 } else {
-                  context.go(AppRoutePath.chatbot);
+                  context.go(AppRoutePath.login);
                 }
               },
               child: const Text("Go Back"),

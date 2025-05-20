@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:hive/hive.dart';
+import 'package:lextorah_chat_bot/hive/uploaded_file_hive_model.dart';
+import 'package:lextorah_chat_bot/providers/chat_messages_provider.dart';
 import 'package:lextorah_chat_bot/providers/shared_pref.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +26,7 @@ class AuthState {
   final bool isLoading;
   final bool authLoading;
   final String? errorMessage;
+  final String currentText;
 
   AuthState({
     required this.isAuthenticated,
@@ -30,6 +34,7 @@ class AuthState {
     this.isLoading = false,
     this.authLoading = false,
     this.errorMessage,
+    this.currentText = "",
   });
 
   AuthState copyWith({
@@ -38,6 +43,7 @@ class AuthState {
     bool? authLoading,
     String? errorMessage,
     User? user,
+    String? currentText, // <-- Add to copyWith
   }) {
     return AuthState(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
@@ -45,6 +51,7 @@ class AuthState {
       errorMessage: errorMessage,
       user: user ?? this.user,
       authLoading: authLoading ?? this.authLoading,
+      currentText: currentText ?? this.currentText, // <-- Copy value
     );
   }
 }
@@ -58,6 +65,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void _notifyAuthChange() {
     _controller.add(null); // triggers refresh listeners
+  }
+
+  // Getter for currentText
+  String get currentText => state.currentText;
+
+  // Setter for currentText
+  set currentText(String value) {
+    state = state.copyWith(currentText: value);
+  }
+
+  Future<void> persistUser({required User user, required WidgetRef ref}) async {
+    final prefs = ref.read(sharedPrefsProvider);
+    await prefs.setString('token', user.token);
+    await prefs.setString('email', user.email);
+    await prefs.setString('id', user.id);
+    await prefs.setString('role', user.role.name);
+    await prefs.setString('trialEndsAt', user.trialEndsAt.toIso8601String());
   }
 
   Future<void> freeTrialLogin({
@@ -95,6 +119,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           .timeout(const Duration(seconds: 120));
 
       if (response.statusCode == 200) {
+        state = state.copyWith(authLoading: false);
         final data = jsonDecode(response.body);
         final detail = data['detail'] ?? "OTP sent, please verify to continue";
 
@@ -107,58 +132,97 @@ class AuthNotifier extends StateNotifier<AuthState> {
           fontSize: 14.0,
         );
 
-        await Future.delayed(const Duration(seconds: 1));
-
-        if (context.mounted) {
-          context.go(AppRoutePath.otpVerification); // Or OTP route if required
-        }
-
-        state = state.copyWith(authLoading: false);
+        //  context.go(AppRoutePath.otpVerification); // Or OTP route if required
+        final mail = Uri.encodeComponent(email);
+        context.go('/auth/verify-otp/$mail');
       } else {
         final data = jsonDecode(response.body);
         final error = data['detail'] ?? 'Login failed. Please try again.';
 
         state = state.copyWith(authLoading: false, errorMessage: error);
-
-        Fluttertoast.showToast(
-          msg: error,
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: Colors.red,
-          textColor: Colors.white,
-          fontSize: 14.0,
-        );
       }
     } on TimeoutException {
       const error = 'Connection timed out. Please check your network.';
       state = state.copyWith(authLoading: false, errorMessage: error);
-
-      Fluttertoast.showToast(
-        msg: error,
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red,
-        textColor: Colors.white,
-        fontSize: 14.0,
-      );
     } on http.ClientException {
       const error = 'Network error occurred. Please try again.';
       state = state.copyWith(authLoading: false, errorMessage: error);
-
-      Fluttertoast.showToast(
-        msg: error,
-        toastLength: Toast.LENGTH_LONG,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red,
-        textColor: Colors.white,
-        fontSize: 14.0,
-      );
     } catch (e, stack) {
       debugPrintStack(label: 'Login error', stackTrace: stack);
 
       const error = 'Unexpected error occurred. Please try again.';
       state = state.copyWith(authLoading: false, errorMessage: error);
+    }
+  }
 
+  Future<void> verifyOtp({
+    required BuildContext context,
+    StreamController<ErrorAnimationType>? errorController,
+    String? email,
+    required WidgetRef ref,
+  }) async {
+    print("otp: " + currentText);
+    print("email: " + email!);
+    state = state.copyWith(authLoading: true, errorMessage: null);
+    try {
+      final response = await http.post(
+        Uri.parse('https://ai1-zjt4.onrender.com/api/api/verify'),
+        body: jsonEncode({'email': email.trim(), 'otp': currentText.trim()}),
+        headers: {'Content-Type': 'application/json'},
+      );
+      print("response" + response.body.toString());
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print("response" + data.toString());
+        final token = data['token'];
+        final trial_ends_at = data['trial_ends_at'];
+        final decoded = JwtDecoder.decode(token);
+
+        state = AuthState(
+          isAuthenticated: true,
+          authLoading: false,
+          user: User(
+            id: decoded['sub'],
+            email: decoded['email'],
+            role: userRoleFromString(decoded['role']),
+            tokenExpiresAt: JwtDecoder.getExpirationDate(token),
+            trialEndsAt: DateTime.parse(trial_ends_at),
+            token: token,
+          ),
+        );
+        persistUser(
+          user: User(
+            id: decoded['sub'],
+            email: decoded['email'],
+            role: userRoleFromString(decoded['role']),
+            tokenExpiresAt: JwtDecoder.getExpirationDate(token),
+            trialEndsAt: DateTime.parse(trial_ends_at),
+            token: token,
+          ),
+          ref: ref,
+        );
+        Fluttertoast.showToast(
+          msg: "success",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+          fontSize: 14.0,
+        );
+        final chatNotifier = ref.read(chatMessagesProvider.notifier);
+        chatNotifier.deleteAllMessages();
+        _notifyAuthChange();
+      } else {
+        final data = jsonDecode(response.body);
+        final error = data['detail'] ?? 'Invalid OTP';
+        errorController?.add(ErrorAnimationType.shake); // Tr
+        state = state.copyWith(authLoading: false, errorMessage: error);
+      }
+    } catch (e) {
+      final error = e.toString();
+      state = state.copyWith(authLoading: false, errorMessage: error);
+      errorController?.add(ErrorAnimationType.shake);
+      print(" error :" + e.toString());
       Fluttertoast.showToast(
         msg: error,
         toastLength: Toast.LENGTH_LONG,
@@ -170,23 +234,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> verifyOtp({
+  Future<void> standardLogin({
+    required String email,
+    String? password,
     required BuildContext context,
-    StreamController<ErrorAnimationType>? errorController,
-    String? email,
-    required String otp,
+    required WidgetRef ref,
   }) async {
     state = state.copyWith(authLoading: true, errorMessage: null);
     try {
       final response = await http.post(
-        Uri.parse('https://ai1-zjt4.onrender.com/api/api/verify'),
-        body: jsonEncode({'email': email, 'otp': otp}),
+        Uri.parse('https://www.lextorah-elearning.com/ap/laravel/api/login'),
+        body: jsonEncode({'email': email, 'password': password}),
         headers: {'Content-Type': 'application/json'},
       );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final token = data['token'];
-        final trial_ends_at = data['trial_ends_at'];
+        final trial_ends_at = data['expires_in'];
         final decoded = JwtDecoder.decode(token);
 
         state = AuthState(
@@ -200,6 +264,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
             token: token,
           ),
         );
+        persistUser(
+          user: User(
+            id: decoded['sub'],
+            email: decoded['email'],
+            role: userRoleFromString(decoded['role']),
+            tokenExpiresAt: JwtDecoder.getExpirationDate(token),
+            trialEndsAt: DateTime.parse(trial_ends_at),
+            token: token,
+          ),
+          ref: ref,
+        );
         Fluttertoast.showToast(
           msg: "success",
           toastLength: Toast.LENGTH_LONG,
@@ -208,18 +283,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
           textColor: Colors.white,
           fontSize: 14.0,
         );
+        final chatNotifier = ref.read(chatMessagesProvider.notifier);
+        chatNotifier.deleteAllMessages();
         _notifyAuthChange();
       } else {
         final data = jsonDecode(response.body);
-        final error = data['detail'] ?? 'Invalid OTP';
+        final error = data['msg'] ?? 'Login failed. Please try again.';
+
         state = state.copyWith(authLoading: false, errorMessage: error);
-        errorController?.add(ErrorAnimationType.shake); // Tr
       }
-    } catch (e) {
-      errorController?.add(ErrorAnimationType.shake);
-      print(e);
-    } finally {
-      state = state.copyWith(authLoading: false);
+    } on TimeoutException {
+      const error = 'Connection timed out. Please check your network.';
+      state = state.copyWith(authLoading: false, errorMessage: error);
+    } on http.ClientException {
+      const error = 'Network error occurred. Please try again.';
+      state = state.copyWith(authLoading: false, errorMessage: error);
+    } catch (e, stack) {
+      debugPrintStack(label: 'Login error', stackTrace: stack);
+      print("error" + e.toString());
+      const error = 'Unexpected error occurred. Please try again.';
+      state = state.copyWith(authLoading: false, errorMessage: error);
     }
   }
 
@@ -282,9 +365,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  void logout() {
+  Future<void> logout(WidgetRef ref) async {
+    // Clear auth state
     state = AuthState(isAuthenticated: false);
     _notifyAuthChange();
+
+    // Clear SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+
+    final chatNotifier = ref.read(chatMessagesProvider.notifier);
+    chatNotifier.deleteAllMessages();
+    final box = await Hive.openBox<UploadedFileHiveModel>('uploaded');
+  }
+
+  Future<void> tryAutoLogin() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token == null || JwtDecoder.isExpired(token)) return;
+
+    final email = prefs.getString('email');
+    final id = prefs.getString('id');
+    final role = userRoleFromString(prefs.getString('role') ?? '');
+    final trialEndsAt = DateTime.parse(prefs.getString('trialEndsAt') ?? '');
+
+    final user = User(
+      id: id!,
+      email: email!,
+      role: role,
+      token: token,
+      tokenExpiresAt: JwtDecoder.getExpirationDate(token),
+      trialEndsAt: trialEndsAt,
+    );
+
+    state = AuthState(isAuthenticated: true, user: user);
   }
 
   // Don’t forget to close the controller if you manually dispose

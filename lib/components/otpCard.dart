@@ -234,7 +234,6 @@ class OtpCard extends StatelessWidget {
                     ),
                     GestureDetector(
                       onTap: () {
-                        Navigator.pop(context);
                         context.go(AppRoutePath.login);
                       },
                       child: Text(

@@ -41,10 +41,11 @@ class _PinCodeVerificationScreenState
     return OtpCard(
       errorMessage: auth.errorMessage,
       onChanged: (value) {
-        //  regProvider.currentText = value;
+        ref.read(authProvider.notifier).currentText = value;
       },
       email: widget.email,
       formKey: formKey,
+
       errorController: errorController,
       textEditingController: textEditingController,
       onCompleted: (v) {
@@ -52,7 +53,8 @@ class _PinCodeVerificationScreenState
           context: context,
           errorController: errorController,
           email: widget.email,
-          otp: v,
+
+          ref: ref,
         );
       },
 
@@ -67,7 +69,7 @@ class _PinCodeVerificationScreenState
           context: context,
         );
       },
-      currentText: "",
+      currentText: authNotifier.currentText,
     );
   }
 }

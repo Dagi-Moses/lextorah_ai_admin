@@ -46,15 +46,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ref: ref,
         );
       } else {
-        Fluttertoast.showToast(
-          msg:
-              "we havent added that functionality yet, please try again soon...",
-          toastLength: Toast.LENGTH_LONG,
-          gravity: ToastGravity.CENTER,
-          timeInSecForIosWeb: 1,
-          backgroundColor: Colors.green,
-          textColor: Colors.white,
-          fontSize: 16.0,
+        authNotifier.standardLogin(
+          email: emailController.text.trim(),
+          password: passwordController.text.trim(),
+          context: context,
+          ref: ref,
         );
       }
     }
@@ -75,6 +71,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                SizedBox(height: 5),
                 const Text(
                   "Welcome to lextorah - school of languages",
                   style: TextStyle(
@@ -221,12 +218,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(height: 10),
                         auth.errorMessage != null
-                            ? Text(
-                              auth.errorMessage!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.red,
-                                letterSpacing: 0.5,
+                            ? Center(
+                              child: Text(
+                                auth.errorMessage!,
+                                softWrap: true,
+
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.red,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
                             )
                             : SizedBox(),

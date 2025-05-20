@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
+import 'package:lextorah_chat_bot/providers/auth_provider.dart';
 import 'package:lextorah_chat_bot/providers/shared_pref.dart';
 import 'package:lextorah_chat_bot/screens/splash_screen.dart';
 import 'package:lextorah_chat_bot/src/routes.dart';
@@ -17,15 +18,18 @@ void main() async {
 
 class MyApp extends ConsumerWidget {
   final Future<void> _init = _initializeApp();
-
   static Future<void> _initializeApp() async {
     await initHive();
+
     final prefs = await SharedPreferences.getInstance();
-
-    // You can init other things here too
-    // await Firebase.initializeApp();
-
     _globalOverrides = [sharedPrefsProvider.overrideWithValue(prefs)];
+
+    final container = ProviderContainer(overrides: _globalOverrides);
+
+    await container.read(authProvider.notifier).tryAutoLogin();
+
+    // Dispose the container after use
+    container.dispose();
   }
 
   static late List<Override> _globalOverrides;

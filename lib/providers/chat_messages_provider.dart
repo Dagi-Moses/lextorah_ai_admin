@@ -23,6 +23,12 @@ class ChatMessagesNotifier extends StateNotifier<List<ChatMessage>> {
     state = [...state, message];
   }
 
+  Future<void> deleteAllMessages() async {
+    final box = await Hive.openBox<ChatMessage>('chatBox');
+    await box.clear();
+    state = []; // clear your in-memory state list too
+  }
+
   Future<void> removeTypingIndicator() async {
     final box = await Hive.openBox<ChatMessage>('chatBox');
 
