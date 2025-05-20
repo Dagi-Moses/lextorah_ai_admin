@@ -59,14 +59,6 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier() : super(AuthState(isAuthenticated: false));
 
-  final _controller = StreamController<void>.broadcast();
-
-  Stream<void> get authChanges => _controller.stream;
-
-  void _notifyAuthChange() {
-    _controller.add(null); // triggers refresh listeners
-  }
-
   // Getter for currentText
   String get currentText => state.currentText;
 
@@ -132,9 +124,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
           fontSize: 14.0,
         );
 
-        //  context.go(AppRoutePath.otpVerification); // Or OTP route if required
-        final mail = Uri.encodeComponent(email);
-        context.go('/auth/verify-otp/$mail');
+        context.goNamed(
+          AppRouteName.otpVerification,
+          pathParameters: {'email': Uri.encodeComponent(email)},
+        );
       } else {
         final data = jsonDecode(response.body);
         final error = data['detail'] ?? 'Login failed. Please try again.';
@@ -177,19 +170,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final token = data['token'];
         final trial_ends_at = data['trial_ends_at'];
         final decoded = JwtDecoder.decode(token);
-
+        final userRole = userRoleFromString(decoded['role']);
         state = AuthState(
           isAuthenticated: true,
           authLoading: false,
           user: User(
             id: decoded['sub'],
             email: decoded['email'],
-            role: userRoleFromString(decoded['role']),
+            role: userRole,
             tokenExpiresAt: JwtDecoder.getExpirationDate(token),
             trialEndsAt: DateTime.parse(trial_ends_at),
             token: token,
           ),
         );
+        print("userrrrrrrrrrr: " + userRole.toString());
         persistUser(
           user: User(
             id: decoded['sub'],
@@ -201,6 +195,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
           ),
           ref: ref,
         );
+
+        Future.delayed(Duration(seconds: 1), () {
+          final router = GoRouter.of(context);
+          if (userRole.isAdmin) {
+            router.go(AppRoutePath.upload);
+          } else {
+            router.go(AppRoutePath.chat);
+          }
+        });
         Fluttertoast.showToast(
           msg: "success",
           toastLength: Toast.LENGTH_LONG,
@@ -211,7 +214,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         final chatNotifier = ref.read(chatMessagesProvider.notifier);
         chatNotifier.deleteAllMessages();
-        _notifyAuthChange();
       } else {
         final data = jsonDecode(response.body);
         final error = data['detail'] ?? 'Invalid OTP';
@@ -264,6 +266,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             token: token,
           ),
         );
+        print("userrole: " + userRoleFromString(decoded['role']).toString());
         persistUser(
           user: User(
             id: decoded['sub'],
@@ -285,7 +288,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         final chatNotifier = ref.read(chatMessagesProvider.notifier);
         chatNotifier.deleteAllMessages();
-        _notifyAuthChange();
       } else {
         final data = jsonDecode(response.body);
         final error = data['msg'] ?? 'Login failed. Please try again.';
@@ -368,7 +370,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout(WidgetRef ref) async {
     // Clear auth state
     state = AuthState(isAuthenticated: false);
-    _notifyAuthChange();
 
     // Clear SharedPreferences
     final prefs = await SharedPreferences.getInstance();
@@ -377,6 +378,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final chatNotifier = ref.read(chatMessagesProvider.notifier);
     chatNotifier.deleteAllMessages();
     final box = await Hive.openBox<UploadedFileHiveModel>('uploaded');
+    box.clear();
   }
 
   Future<void> tryAutoLogin() async {
@@ -400,12 +402,5 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
 
     state = AuthState(isAuthenticated: true, user: user);
-  }
-
-  // Don’t forget to close the controller if you manually dispose
-  @override
-  void dispose() {
-    _controller.close();
-    super.dispose();
   }
 }

@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lextorah_chat_bot/admin/components/nav_item.dart';
+import 'package:lextorah_chat_bot/providers/auth_provider.dart';
 import 'package:lextorah_chat_bot/src/routes.dart';
 import 'package:lextorah_chat_bot/utils/screen_helper.dart';
 
 // Adjust import
 
-class SideMenu extends StatefulWidget {
-  const SideMenu({Key? key}) : super(key: key);
+class StudentMenu extends ConsumerStatefulWidget {
+  const StudentMenu({Key? key}) : super(key: key);
 
   @override
-  State<SideMenu> createState() => _SideMenuState();
+  ConsumerState<StudentMenu> createState() => _StudentMenuState();
 }
 
-class _SideMenuState extends State<SideMenu> {
+class _StudentMenuState extends ConsumerState<StudentMenu> {
   @override
   Widget build(BuildContext context) {
     final isTablet = ScreenHelper.isTablet(context);
@@ -41,12 +43,23 @@ class _SideMenuState extends State<SideMenu> {
             label: 'Chat bot',
             route: AppRoutePath.chat,
           ),
-          buildNavItem(
-            context: context,
-            icon: Icons.upload_file,
-            label: 'Upload Document',
-            route: AppRoutePath.upload,
+          Spacer(),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+
+            child: ListTile(
+              leading: Icon(Icons.logout, color: Colors.red),
+              title:
+                  isTablet
+                      ? null
+                      : Text('Logout', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                ref.read(authProvider.notifier).logout(ref);
+                // GoRouter.of(context).go(AppRoutePath.login);
+              },
+            ),
           ),
+          const SizedBox(height: 16),
         ],
       ),
     );

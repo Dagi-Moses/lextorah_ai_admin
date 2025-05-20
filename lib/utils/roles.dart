@@ -19,8 +19,8 @@ extension UserRoleMapper on UserRole {
     }
   }
 
+  bool get isStudent => this == UserRole.student || this == UserRole.trial;
   bool get isAdmin => this == UserRole.admin;
-  bool get isStudent => this == UserRole.student;
   bool get isTrial => this == UserRole.trial;
 }
 
