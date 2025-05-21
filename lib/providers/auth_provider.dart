@@ -17,7 +17,7 @@ import 'package:lextorah_chat_bot/utils/roles.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier();
+  return AuthNotifier(ref);
 });
 
 class AuthState {
@@ -57,7 +57,9 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier() : super(AuthState(isAuthenticated: false));
+  final Ref ref;
+
+  AuthNotifier(this.ref) : super(AuthState(isAuthenticated: false));
 
   // Getter for currentText
   String get currentText => state.currentText;
@@ -67,7 +69,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(currentText: value);
   }
 
-  Future<void> persistUser({required User user, required WidgetRef ref}) async {
+  Future<void> persistUser({required User user}) async {
     final prefs = ref.read(sharedPrefsProvider);
     await prefs.setString('token', user.token);
     await prefs.setString('email', user.email);
@@ -82,7 +84,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required BuildContext context,
     TextEditingController? resendController,
     bool isResend = false,
-    required WidgetRef ref,
   }) async {
     state = state.copyWith(authLoading: true, errorMessage: null);
     // Retrieve data from SharedPreferences
@@ -90,11 +91,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? pass;
 
     try {
-      if (isResend) {
+      if (!isResend && password != null) {
         resendController?.clear();
         final passwor = prefs.getString('reg_password') ?? '';
         pass = passwor;
       }
+
       // Persist user data
       if (!isResend) {
         await prefs.setString('reg_password', password!);
@@ -108,7 +110,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             }),
             headers: {'Content-Type': 'application/json'},
           )
-          .timeout(const Duration(seconds: 120));
+          .timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         state = state.copyWith(authLoading: false);
@@ -152,17 +154,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required BuildContext context,
     StreamController<ErrorAnimationType>? errorController,
     String? email,
-    required WidgetRef ref,
   }) async {
     print("otp: " + currentText);
     print("email: " + email!);
     state = state.copyWith(authLoading: true, errorMessage: null);
     try {
-      final response = await http.post(
-        Uri.parse('https://ai1-zjt4.onrender.com/api/api/verify'),
-        body: jsonEncode({'email': email.trim(), 'otp': currentText.trim()}),
-        headers: {'Content-Type': 'application/json'},
-      );
+      final response = await http
+          .post(
+            Uri.parse('https://ai1-zjt4.onrender.com/api/api/verify'),
+            body: jsonEncode({
+              'email': email.trim(),
+              'otp': currentText.trim(),
+            }),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 60));
+
       print("response" + response.body.toString());
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -193,7 +200,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
             trialEndsAt: DateTime.parse(trial_ends_at),
             token: token,
           ),
-          ref: ref,
         );
 
         Future.delayed(Duration(seconds: 1), () {
@@ -220,6 +226,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         errorController?.add(ErrorAnimationType.shake); // Tr
         state = state.copyWith(authLoading: false, errorMessage: error);
       }
+    } on TimeoutException {
+      const error = 'Connection timed out. Please check your network.';
+      state = state.copyWith(authLoading: false, errorMessage: error);
+    } on http.ClientException {
+      const error = 'Network error occurred. Please try again.';
+      state = state.copyWith(authLoading: false, errorMessage: error);
     } catch (e) {
       final error = e.toString();
       state = state.copyWith(authLoading: false, errorMessage: error);
@@ -238,29 +250,37 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> standardLogin({
     required String email,
-    String? password,
+    required String password,
     required BuildContext context,
-    required WidgetRef ref,
   }) async {
     state = state.copyWith(authLoading: true, errorMessage: null);
     try {
-      final response = await http.post(
-        Uri.parse('https://www.lextorah-elearning.com/ap/laravel/api/login'),
-        body: jsonEncode({'email': email, 'password': password}),
-        headers: {'Content-Type': 'application/json'},
-      );
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+      final response = await http
+          .post(
+            Uri.parse(
+              'https://www.lextorah-elearning.com/ap/laravel/api/login',
+            ),
+            body: jsonEncode({
+              'email': email.trim(),
+              'password': password.trim(),
+            }),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(const Duration(seconds: 60));
+
+      print("Decoded login response: ${response.body}");
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
         final token = data['token'];
         final trial_ends_at = data['expires_in'];
         final decoded = JwtDecoder.decode(token);
-
+        final userRole = userRoleFromString(decoded['role']);
         state = AuthState(
           isAuthenticated: true,
           user: User(
             id: decoded['sub'],
             email: decoded['email'],
-            role: userRoleFromString(decoded['role']),
+            role: userRole,
             tokenExpiresAt: JwtDecoder.getExpirationDate(token),
             trialEndsAt: DateTime.parse(trial_ends_at),
             token: token,
@@ -271,13 +291,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
           user: User(
             id: decoded['sub'],
             email: decoded['email'],
-            role: userRoleFromString(decoded['role']),
+            role: userRole,
             tokenExpiresAt: JwtDecoder.getExpirationDate(token),
             trialEndsAt: DateTime.parse(trial_ends_at),
             token: token,
           ),
-          ref: ref,
         );
+
+        Future.delayed(Duration(seconds: 1), () {
+          final router = GoRouter.of(context);
+          if (userRole.isAdmin) {
+            router.go(AppRoutePath.upload);
+          } else {
+            router.go(AppRoutePath.chat);
+          }
+        });
         Fluttertoast.showToast(
           msg: "success",
           toastLength: Toast.LENGTH_LONG,
@@ -290,7 +318,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         chatNotifier.deleteAllMessages();
       } else {
         final data = jsonDecode(response.body);
-        final error = data['msg'] ?? 'Login failed. Please try again.';
+        final error = data['msg'] ?? "Login failed. Please try again.";
 
         state = state.copyWith(authLoading: false, errorMessage: error);
       }
@@ -303,7 +331,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } catch (e, stack) {
       debugPrintStack(label: 'Login error', stackTrace: stack);
       print("error" + e.toString());
-      const error = 'Unexpected error occurred. Please try again.';
+      final error = e.toString();
       state = state.copyWith(authLoading: false, errorMessage: error);
     }
   }
@@ -367,7 +395,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> logout(WidgetRef ref) async {
+  Future<void> logout() async {
     // Clear auth state
     state = AuthState(isAuthenticated: false);
 

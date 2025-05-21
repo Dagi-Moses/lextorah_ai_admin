@@ -37,20 +37,13 @@ class _BottomChatFieldState extends ConsumerState<BottomChatField> {
 
     textController.clear();
 
-    await chatNotifier.addMessage(
-      ChatMessage(
-        text: '', // Empty since it's just a placeholder
-        isTyping: true,
-      ),
-    );
+    await chatNotifier.addMessage(ChatMessage(text: '', isTyping: true));
 
-    // 2. Add typing indicator (before API call
     try {
-      await ref.read(chatControllerProvider).sendMessage(message);
+      await ref.read(chatControllerProvider).sendMessage(context, message);
     } catch (e) {
       log('Error sending message: $e');
     } finally {
-      //  textController.clear();
       textFieldFocus.unfocus();
     }
   }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lextorah_chat_bot/components/customButton.dart';
 import 'package:lextorah_chat_bot/components/customTextField.dart';
@@ -43,14 +42,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           email: emailController.text.trim(),
           password: passwordController.text.trim(),
           context: context,
-          ref: ref,
         );
       } else {
         authNotifier.standardLogin(
           email: emailController.text.trim(),
           password: passwordController.text.trim(),
           context: context,
-          ref: ref,
         );
       }
     }

@@ -53,8 +53,6 @@ class _PinCodeVerificationScreenState
           context: context,
           errorController: errorController,
           email: widget.email,
-
-          ref: ref,
         );
       },
 
@@ -65,7 +63,6 @@ class _PinCodeVerificationScreenState
           email: widget.email ?? "",
           resendController: textEditingController,
           isResend: true,
-          ref: ref,
           context: context,
         );
       },

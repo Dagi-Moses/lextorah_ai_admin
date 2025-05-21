@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:lextorah_chat_bot/providers/auth_provider.dart';
 import 'package:lextorah_chat_bot/providers/shared_pref.dart';
-import 'package:lextorah_chat_bot/screens/splash_screen.dart';
 import 'package:lextorah_chat_bot/src/routes.dart';
 
 import 'package:lextorah_chat_bot/utils/hive.dart';
@@ -21,8 +20,9 @@ void main() async {
   // Preload auth state
   _globalOverrides = [sharedPrefsProvider.overrideWithValue(prefs)];
   await authNotifier.tryAutoLogin();
+  runApp(ProviderScope(overrides: _globalOverrides, child: MyApp()));
 
-  runApp(UncontrolledProviderScope(container: container, child: MyApp()));
+  //runApp(UncontrolledProviderScope(container: container, child: MyApp()));
 }
 
 late List<Override> _globalOverrides;

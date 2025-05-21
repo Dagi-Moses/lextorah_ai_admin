@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:lextorah_chat_bot/components/session_expired.dart';
 import 'package:lextorah_chat_bot/hive/chat_message.dart';
 import 'package:lextorah_chat_bot/providers/auth_provider.dart';
 import 'package:lextorah_chat_bot/providers/chat_messages_provider.dart';
@@ -16,7 +18,7 @@ class ChatController {
 
   ChatController(this.ref);
 
-  Future<void> sendMessage(String text) async {
+  Future<void> sendMessage(BuildContext context, String text) async {
     final chatNotifier = ref.read(chatMessagesProvider.notifier);
     final token = ref.read(authProvider).user?.token;
     try {
@@ -30,13 +32,16 @@ class ChatController {
       );
 
       await chatNotifier.removeTypingIndicator();
+      final reply =
+          jsonDecode(response.body)['answer'] ??
+          'Error: Something went wrong. Please try again later...';
 
+      final botMessage = ChatMessage(text: reply);
       if (response.statusCode == 200) {
-        final reply = jsonDecode(response.body)['answer'] ?? 'No response';
-
-        final botMessage = ChatMessage(text: reply);
-
         await ref.read(chatMessagesProvider.notifier).addMessage(botMessage);
+      } else if (response.statusCode == 401) {
+        await ref.read(chatMessagesProvider.notifier).addMessage(botMessage);
+        showSessionExpiredDialog(context, ref);
       } else {
         await ref
             .read(chatMessagesProvider.notifier)

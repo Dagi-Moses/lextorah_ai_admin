@@ -54,8 +54,7 @@ class _StudentMenuState extends ConsumerState<StudentMenu> {
                       ? null
                       : Text('Logout', style: TextStyle(color: Colors.red)),
               onTap: () {
-                ref.read(authProvider.notifier).logout(ref);
-                // GoRouter.of(context).go(AppRoutePath.login);
+                ref.read(authProvider.notifier).logout();
               },
             ),
           ),
