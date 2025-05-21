@@ -273,6 +273,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (data['success'] == true) {
         final token = data['token'];
         final trial_ends_at = data['expires_in'];
+        final trialEndsAt =
+            DateTime.tryParse(trial_ends_at) ??
+            DateTime.fromMillisecondsSinceEpoch(
+              int.parse(trial_ends_at.toString()) * 1000,
+            );
         final decoded = JwtDecoder.decode(token);
         final userRole = userRoleFromString(decoded['role']);
         state = AuthState(
@@ -282,7 +287,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             email: decoded['email'],
             role: userRole,
             tokenExpiresAt: JwtDecoder.getExpirationDate(token),
-            trialEndsAt: DateTime.parse(trial_ends_at),
+            trialEndsAt: trialEndsAt,
             token: token,
           ),
         );
