@@ -177,7 +177,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final token = data['token'];
         final trial_ends_at = data['trial_ends_at'];
         final decoded = JwtDecoder.decode(token);
-        final userRole = userRoleFromString(decoded['role']);
+        final userRole = userRoleFromString(decoded['student_id']);
+
         state = AuthState(
           isAuthenticated: true,
           authLoading: false,
@@ -185,6 +186,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             id: decoded['sub'],
             email: decoded['email'],
             role: userRole,
+            //  role: UserRole.admin,
             tokenExpiresAt: JwtDecoder.getExpirationDate(token),
             trialEndsAt: DateTime.parse(trial_ends_at),
             token: token,
@@ -268,7 +270,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
           )
           .timeout(const Duration(seconds: 60));
 
-      print("Decoded login response: ${response.body}");
       final data = jsonDecode(response.body);
       if (data['success'] == true) {
         final token = data['token'];
@@ -279,7 +280,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
               int.parse(trial_ends_at.toString()) * 1000,
             );
         final decoded = JwtDecoder.decode(token);
-        final userRole = userRoleFromString(decoded['role']);
+        final userRole = userRoleFromString(decoded['student_id']);
+
         state = AuthState(
           isAuthenticated: true,
           user: User(

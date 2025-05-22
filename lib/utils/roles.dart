@@ -15,7 +15,7 @@ extension UserRoleMapper on UserRole {
       case UserRole.trial:
         return 'trial';
       default:
-        return 'unknown';
+        return 'student';
     }
   }
 
@@ -33,6 +33,6 @@ UserRole userRoleFromString(String? role) {
     case 'trial':
       return UserRole.trial;
     default:
-      return UserRole.unknown;
+      return UserRole.student;
   }
 }

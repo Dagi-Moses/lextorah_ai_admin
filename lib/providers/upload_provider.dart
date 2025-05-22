@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:lextorah_chat_bot/admin/components/file_upload_box.dart';
 import 'package:lextorah_chat_bot/hive/uploaded_file_hive_model.dart';
+import 'package:lextorah_chat_bot/providers/auth_provider.dart';
 import 'package:lextorah_chat_bot/providers/uploaded_files_provider.dart';
 import 'package:lextorah_chat_bot/src/api_service.dart'; // Replace with correct path
 
@@ -23,6 +24,7 @@ class UploadController extends StateNotifier<AsyncValue<void>> {
 
   Future<void> uploadFiles() async {
     final pickedFiles = ref.read(pickedFilesProvider);
+    final token = ref.read(authProvider).user?.token;
     if (pickedFiles.isEmpty) return;
     final errors = <String>[];
     for (final file in pickedFiles) {
@@ -32,14 +34,16 @@ class UploadController extends StateNotifier<AsyncValue<void>> {
         final uri = Uri.parse(ApiService.upload);
         if (file.bytes == null) throw Exception("File bytes are null");
 
-        final request = http.MultipartRequest('POST', uri)
-          ..files.add(
-            http.MultipartFile.fromBytes(
-              'file',
-              file.bytes!,
-              filename: file.name,
-            ),
-          );
+        final request =
+            http.MultipartRequest('POST', uri)
+              ..headers['Authorization'] = 'Bearer $token'
+              ..files.add(
+                http.MultipartFile.fromBytes(
+                  'file',
+                  file.bytes!,
+                  filename: file.name,
+                ),
+              );
 
         final response = await request.send();
         final success = response.statusCode == 200;
