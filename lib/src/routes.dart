@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lextorah_chat_bot/admin/components/side_bar.dart';
 import 'package:lextorah_chat_bot/admin/screens/upload.dart';
 import 'package:lextorah_chat_bot/providers/auth_provider.dart';
+import 'package:lextorah_chat_bot/providers/init.dart';
 import 'package:lextorah_chat_bot/screens/errorScreen.dart';
 import 'package:lextorah_chat_bot/screens/home_screen.dart';
 import 'package:lextorah_chat_bot/screens/login.dart';
@@ -48,42 +49,69 @@ class AppRouter {
       authProvider.select((state) => state.isAuthenticated),
     );
     final role = ref.watch(authProvider.select((state) => state.user?.role));
-
+    final init = ref.watch(appInitProvider);
     return GoRouter(
       debugLogDiagnostics: true,
-      initialLocation:
-          !isAuth
-              ? AppRoutePath.splash
-              : (role?.isAdmin ?? false)
-              ? AppRoutePath.upload
-              : AppRoutePath.chat,
+      initialLocation: AppRoutePath.splash,
       redirect: (context, state) {
         final location = state.uri.toString();
+        final isPublic = publicPaths.any((p) => location.startsWith(p));
+        final isSplash = location == AppRoutePath.splash;
 
-        final isPublic = publicPaths.any((path) => location.startsWith(path));
+        if (init.isLoading) return AppRoutePath.splash;
 
-        if (!isAuth && !isPublic) {
-          return AppRoutePath.login;
-        }
+        if (!isAuth && !isPublic) return AppRoutePath.login;
 
-        if (isAuth &&
-            role?.isStudent == true &&
-            location.startsWith('/admin')) {
-          return AppRoutePath.chat;
-        }
-
-        if (isAuth && role?.isTrial == true && location.startsWith('/admin')) {
-          return AppRoutePath.chat;
-        }
-
-        if (isAuth && location.startsWith('/auth')) {
-          return (role?.isAdmin ?? false)
+        if (isAuth && isSplash) {
+          return role?.isAdmin ?? false
               ? AppRoutePath.upload
               : AppRoutePath.chat;
         }
 
+        if (isAuth && location.startsWith('/auth')) {
+          return role?.isAdmin ?? false
+              ? AppRoutePath.upload
+              : AppRoutePath.chat;
+        }
+
+        if (isAuth &&
+            location.startsWith('/admin') &&
+            role?.isStudent == true) {
+          return AppRoutePath.chat;
+        }
+
         return null;
       },
+
+      // redirect: (context, state) {
+      //   final location = state.uri.toString();
+
+      //   final isPublic = publicPaths.any((path) => location.startsWith(path));
+      //   if (init.isLoading || init.hasError) {
+      //     return AppRoutePath.splash;
+      //   }
+      //   if (!isAuth && !isPublic) {
+      //     return AppRoutePath.login;
+      //   }
+
+      //   if (isAuth &&
+      //       role?.isStudent == true &&
+      //       location.startsWith('/admin')) {
+      //     return AppRoutePath.chat;
+      //   }
+
+      //   if (isAuth && role?.isTrial == true && location.startsWith('/admin')) {
+      //     return AppRoutePath.chat;
+      //   }
+
+      //   if (isAuth && location.startsWith('/auth')) {
+      //     return (role?.isAdmin ?? false)
+      //         ? AppRoutePath.upload
+      //         : AppRoutePath.chat;
+      //   }
+
+      //   return null;
+      // },
       errorBuilder:
           (context, state) =>
               ErrorScreen(message: state.error?.toString() ?? "Page not found"),

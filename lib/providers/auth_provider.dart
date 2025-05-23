@@ -3,7 +3,8 @@ import 'dart:convert';
 import 'package:hive/hive.dart';
 import 'package:lextorah_chat_bot/hive/uploaded_file_hive_model.dart';
 import 'package:lextorah_chat_bot/providers/chat_messages_provider.dart';
-import 'package:lextorah_chat_bot/providers/shared_pref.dart';
+import 'package:lextorah_chat_bot/src/const.dart';
+
 import 'package:pin_code_fields/pin_code_fields.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
@@ -70,7 +71,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> persistUser({required User user}) async {
-    final prefs = ref.read(sharedPrefsProvider);
     await prefs.setString('token', user.token);
     await prefs.setString('email', user.email);
     await prefs.setString('id', user.id);
@@ -87,7 +87,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(authLoading: true, errorMessage: null);
     // Retrieve data from SharedPreferences
-    final prefs = ref.read(sharedPrefsProvider);
+
     String? pass;
 
     try {
@@ -406,8 +406,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     // Clear auth state
     state = AuthState(isAuthenticated: false);
 
-    // Clear SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
     final chatNotifier = ref.read(chatMessagesProvider.notifier);
@@ -417,25 +415,60 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> tryAutoLogin() async {
-    final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
+    if (token == null || JwtDecoder.isExpired(token)) {
+      print("Token missing or expired");
 
-    if (token == null || JwtDecoder.isExpired(token)) return;
+      return;
+    }
 
-    final email = prefs.getString('email');
-    final id = prefs.getString('id');
-    final role = userRoleFromString(prefs.getString('role') ?? '');
-    final trialEndsAt = DateTime.parse(prefs.getString('trialEndsAt') ?? '');
+    try {
+      final user = User(
+        id: prefs.getString('id') ?? '',
+        email: prefs.getString('email') ?? '',
+        role: userRoleFromString(prefs.getString('role') ?? ''),
+        token: token,
+        tokenExpiresAt: JwtDecoder.getExpirationDate(token),
+        trialEndsAt:
+            DateTime.tryParse(prefs.getString('trialEndsAt') ?? '') ??
+            DateTime.now(),
+      );
 
-    final user = User(
-      id: id!,
-      email: email!,
-      role: role,
-      token: token,
-      tokenExpiresAt: JwtDecoder.getExpirationDate(token),
-      trialEndsAt: trialEndsAt,
-    );
-
-    state = AuthState(isAuthenticated: true, user: user);
+      state = AuthState(isAuthenticated: true, user: user);
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: e.toString(),
+        toastLength: Toast.LENGTH_LONG,
+        gravity: ToastGravity.CENTER,
+        timeInSecForIosWeb: 1,
+        backgroundColor: Colors.green,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+      print("Auto login failed: $e");
+    }
   }
+
+  // Future<void> tryAutoLogin() async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   final token = prefs.getString('token');
+
+  //   if (token == null || JwtDecoder.isExpired(token)) return;
+
+  //   final email = prefs.getString('email');
+  //   final id = prefs.getString('id');
+  //   final role = userRoleFromString(prefs.getString('role') ?? '');
+  //   final trialEndsAt = DateTime.parse(prefs.getString('trialEndsAt') ?? '');
+
+  //   final user = User(
+  //     id: id!,
+  //     email: email!,
+  //     role: role,
+  //     token: token,
+  //     tokenExpiresAt: JwtDecoder.getExpirationDate(token),
+  //     trialEndsAt: trialEndsAt,
+  //   );
+
+  //   state = AuthState(isAuthenticated: true, user: user);
+  // }
 }
